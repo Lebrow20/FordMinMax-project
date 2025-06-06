@@ -69,7 +69,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType }) => {
       .selectAll('line')
       .data(links)
       .enter().append('line')
-      .attr('stroke-width', 3) // Augmentation de l'épaisseur des liens
+      .attr('stroke-width', 1) // Augmentation de l'épaisseur des liens
       .attr('stroke', d => {
         // Vérifier si ce lien fait partie du chemin trouvé
         if (path && path.path) {
