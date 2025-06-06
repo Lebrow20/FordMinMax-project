@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import GraphPath from '../utils/GraphPath';
 import GraphVisualization from './GraphVisualization';
+import Swal from 'sweetalert2';
 
 const GraphInterface = () => {
   const [vertexCount, setVertexCount] = useState(16);
@@ -106,6 +107,86 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
     );
   }
 
+  const handleEdgeUpdate = (updatedEdge) => {
+    const newEdges = edges.map(edge => {
+      if (edge.source === updatedEdge.source && edge.destination === updatedEdge.destination) {
+        return updatedEdge;
+      }
+      return edge;
+    });
+    setEdges(newEdges);
+  };
+
+  const handleEdgeDelete = (edgeToDelete) => {
+    const newEdges = edges.filter(edge => 
+      !(edge.source === edgeToDelete.source && edge.destination === edgeToDelete.destination)
+    );
+    setEdges(newEdges);
+  };
+
+  // Fonction pour ouvrir la popup de modification avec SweetAlert2
+  const openEditPopup = (edge) => {
+    Swal.fire({
+      title: `Modifier l'arc x${edge.source + 1} → x${edge.destination + 1}`,
+      html: `
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Poids de l'arc :</label>
+          <input id="swal-input-weight" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" type="number" value="${edge.weight}">
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Mettre à jour',
+      cancelButtonText: 'Annuler',
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      focusConfirm: false,
+      preConfirm: () => {
+        const weight = document.getElementById('swal-input-weight').value;
+        if (!weight || isNaN(weight) || parseInt(weight) <= 0) {
+          Swal.showValidationMessage('Veuillez entrer un poids valide (nombre positif)');
+          return false;
+        }
+        return parseInt(weight);
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const updatedEdge = {
+          ...edge,
+          weight: result.value
+        };
+        handleEdgeUpdate(updatedEdge);
+        Swal.fire(
+          'Mis à jour!',
+          `L'arc a été modifié avec un poids de ${result.value}.`,
+          'success'
+        );
+      }
+    });
+  };
+
+  // Fonction pour ouvrir la popup de confirmation de suppression
+  const openDeletePopup = (edge) => {
+    Swal.fire({
+      title: 'Êtes-vous sûr?',
+      html: `Voulez-vous vraiment supprimer l'arc <strong>x${edge.source + 1} → x${edge.destination + 1}</strong> (poids: ${edge.weight})?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Oui, supprimer!',
+      cancelButtonText: 'Annuler',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        handleEdgeDelete(edge);
+        Swal.fire(
+          'Supprimé!',
+          'L\'arc a été supprimé.',
+          'success'
+        );
+      }
+    });
+  };
+
   return (
     <div>
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -180,19 +261,42 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
         </button>
       </div>
 
-      <div className="mb-4 border p-2 min-h-[100px]">
+      <div className="mb-4 border p-2 min-h-[100px] bg-gray-50 rounded">
         {edges.length === 0 ? (
           <p className="text-gray-500">Arêtes du graphe : (aucune)</p>
         ) : (
-          <p>
-            Arêtes du graphe :<br />
-            {edges.map((edge, index) => (
-              <span key={index}>
-                x{edge.source+1} -&gt; x{edge.destination+1} (poids: {edge.weight})
-                <br />
-              </span>
-            ))}
-          </p>
+          <div>
+            <h3 className="font-bold mb-2">Arêtes du graphe :</h3>
+            <div className="grid grid-cols-1 gap-2">
+              {edges.map((edge, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-white rounded shadow-sm hover:bg-blue-50">
+                  <span className="font-medium">
+                    x{edge.source+1} <span className="text-blue-500">→</span> x{edge.destination+1} <span className="text-gray-600 ml-2">(poids: {edge.weight})</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <button 
+                      className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm flex items-center"
+                      onClick={() => openEditPopup(edge)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Modifier
+                    </button>
+                    <button 
+                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm flex items-center"
+                      onClick={() => openDeletePopup(edge)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -203,6 +307,8 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
           edges={edges} 
           path={pathResult} 
           pathType={pathType} 
+          onEdgeUpdate={handleEdgeUpdate}
+          onEdgeDelete={handleEdgeDelete}
         />
       </div>
 
