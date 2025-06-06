@@ -10,24 +10,19 @@ const GraphVisualization = ({ vertices, edges, path, pathType }) => {
     // Nettoyer le SVG précédent
     d3.select(svgRef.current).selectAll("*").remove();
     
-    const width = 1200; // Augmentation de la largeur pour plus d'espace
-    const height = 600; // Augmentation de la hauteur pour plus d'espace
-    const nodeRadius = 30; // Augmentation de la taille des nœuds
+    const width = 1200;
+    const height = 600;
+    const nodeRadius = 30;
     
     // Créer le SVG
     const svg = d3.select(svgRef.current)
       .attr('width', width)
       .attr('height', height);
     
-    // Créer les données pour les nœuds et les liens
+    // Créer les données pour les nœuds
     const nodes = Array.from({ length: vertices }, (_, i) => ({ id: i }));
-    const links = edges.map(edge => ({
-      source: edge.source,
-      target: edge.destination,
-      weight: edge.weight
-    }));
     
-    // Définir des positions fixes pour chaque nœud avec plus d'espace entre eux
+    // Définir des positions fixes pour chaque nœud
     const nodePositions = {
       0: { x: 70, y: 250 },     // x1 (bleu)
       1: { x: 200, y: 250 },    // x2
@@ -44,7 +39,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType }) => {
       12: { x: 750, y: 400 },   // x13
       13: { x: 850, y: 280 },   // x14
       14: { x: 950, y: 180 },   // x15
-      15: { x: 1100, y: 250 }   // x16 (bleu) - déplacé plus à droite
+      15: { x: 1100, y: 250 }   // x16 (bleu)
     };
     
     // Appliquer les positions fixes aux nœuds
@@ -52,63 +47,196 @@ const GraphVisualization = ({ vertices, edges, path, pathType }) => {
       if (nodePositions[node.id]) {
         node.x = nodePositions[node.id].x;
         node.y = nodePositions[node.id].y;
-        // Fixer les positions
         node.fx = node.x;
         node.fy = node.y;
       }
     });
-    
-    // Créer une simulation minimale juste pour établir les liens
-    const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(links).id(d => d.id))
-      .alphaDecay(0.1)
-      .alpha(0.1);
-    
-    // Dessiner les liens avec une épaisseur plus importante
-    const link = svg.append('g')
-      .selectAll('line')
-      .data(links)
-      .enter().append('line')
-      .attr('stroke-width', 1) // Augmentation de l'épaisseur des liens
-      .attr('stroke', d => {
-        // Vérifier si ce lien fait partie du chemin trouvé
-        if (path && path.path) {
-          return path.path.some(p => p.from === d.source.id && p.to === d.target.id) ? 
-            (pathType === 'min' ? '#ff0000' : '#00ff00') : '#999';
-        }
-        return '#999';
+
+    // Créer les arcs directement à partir des arêtes
+    const arcs = edges.map(edge => ({
+      source: nodes.find(n => n.id === edge.source),
+      target: nodes.find(n => n.id === edge.destination),
+      weight: edge.weight,
+      isPathEdge: false,
+      sourceId: edge.source,
+      targetId: edge.destination
+    }));
+
+    // Détecter les arcs bidirectionnels et ajuster leur courbure
+    arcs.forEach((arc, i) => {
+      // Chercher un arc inverse
+      const reverseArc = arcs.find((other, j) => 
+        j !== i && 
+        other.sourceId === arc.targetId && 
+        other.targetId === arc.sourceId
+      );
+      
+      if (reverseArc) {
+        // Si c'est le premier arc de la paire (index plus petit), courber vers le haut
+        // Si c'est le second arc, courber vers le bas
+        const isFirstArc = arcs.indexOf(arc) < arcs.indexOf(reverseArc);
+        arc.curve = isFirstArc ? -0.15 : 0.15;
+      } else {
+        // Arc simple, pas de courbure
+        arc.curve = 0;
+      }
+    });
+
+    // Marquer les arcs qui font partie du chemin
+    if (path && path.path) {
+      arcs.forEach(arc => {
+        arc.isPathEdge = path.path.some(p => 
+          p.from === arc.source.id && p.to === arc.target.id
+        );
       });
+    }
+
+    // Définir les marqueurs de flèches avec différentes couleurs
+    const defs = svg.append('defs');
     
-    // Ajouter les flèches pour les liens dirigés avec une taille plus importante
-    svg.append('defs').selectAll('marker')
-      .data(['end'])
-      .enter().append('marker')
-      .attr('id', 'arrow')
+    // Flèche normale
+    defs.append('marker')
+      .attr('id', 'arrow-normal')
       .attr('viewBox', '0 -5 10 10')
-      .attr('refX', nodeRadius + 12) // Ajustement pour la nouvelle taille des nœuds
+      .attr('refX', nodeRadius + 12)
       .attr('refY', 0)
-      .attr('markerWidth', 10) // Augmentation de la taille des flèches
-      .attr('markerHeight', 10) // Augmentation de la taille des flèches
+      .attr('markerWidth', 10)
+      .attr('markerHeight', 10)
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', '#666'); // Couleur plus foncée pour les flèches
-    
-    link.attr('marker-end', 'url(#arrow)');
-    
-    // Dessiner les poids des liens avec une taille plus importante
-    const linkText = svg.append('g')
+      .attr('fill', '#666');
+
+    // Flèche pour chemin minimal (rouge)
+    defs.append('marker')
+      .attr('id', 'arrow-min')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', nodeRadius + 12)
+      .attr('refY', 0)
+      .attr('markerWidth', 10)
+      .attr('markerHeight', 10)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#ff0000');
+
+    // Flèche pour chemin maximal (vert)
+    defs.append('marker')
+      .attr('id', 'arrow-max')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', nodeRadius + 12)
+      .attr('refY', 0)
+      .attr('markerWidth', 10)
+      .attr('markerHeight', 10)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', '#00ff00');
+
+    // Fonction pour créer le chemin d'arc courbe
+    const createArcPath = (d) => {
+      if (d.curve === 0) {
+        // Arc droit
+        return `M ${d.source.x} ${d.source.y} L ${d.target.x} ${d.target.y}`;
+      } else {
+        // Arc courbe - utiliser une courbure plus subtile
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Point de contrôle au milieu avec un décalage perpendiculaire
+        const midX = (d.source.x + d.target.x) / 2;
+        const midY = (d.source.y + d.target.y) / 2;
+        
+        // Vecteur perpendiculaire normalisé
+        const perpX = -dy / distance;
+        const perpY = dx / distance;
+        
+        // Décalage du point de contrôle (plus petit pour une courbure subtile)
+        const offsetDistance = Math.min(distance * 0.2, 40); // Limiter le décalage
+        const controlX = midX + perpX * d.curve * offsetDistance;
+        const controlY = midY + perpY * d.curve * offsetDistance;
+        
+        return `M ${d.source.x} ${d.source.y} Q ${controlX} ${controlY} ${d.target.x} ${d.target.y}`;
+      }
+    };
+
+    // Dessiner les arcs
+    const pathElements = svg.append('g')
+      .selectAll('path')
+      .data(arcs)
+      .enter().append('path')
+      .attr('d', createArcPath)
+      .attr('stroke-width', 1)
+      .attr('stroke', d => {
+        if (d.isPathEdge) {
+          return pathType === 'min' ? '#ff0000' : '#00ff00';
+        }
+        return '#999';
+      })
+      .attr('fill', 'none')
+      .attr('marker-end', d => {
+        if (d.isPathEdge) {
+          return pathType === 'min' ? 'url(#arrow-min)' : 'url(#arrow-max)';
+        }
+        return 'url(#arrow-normal)';
+      });
+
+    // Fonction pour calculer la position du texte sur l'arc courbe
+    const getTextPosition = (d) => {
+      if (d.curve === 0) {
+        // Position pour arc droit avec petit décalage
+        const midX = (d.source.x + d.target.x) / 2;
+        const midY = (d.source.y + d.target.y) / 2;
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        return {
+          x: midX + (dy * 12) / distance,
+          y: midY - (dx * 12) / distance
+        };
+      } else {
+        // Position pour arc courbe
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        const midX = (d.source.x + d.target.x) / 2;
+        const midY = (d.source.y + d.target.y) / 2;
+        
+        const perpX = -dy / distance;
+        const perpY = dx / distance;
+        
+        // Même calcul que pour l'arc mais pour le texte
+        const offsetDistance = Math.min(distance * 0.2, 40);
+        const controlX = midX + perpX * d.curve * offsetDistance;
+        const controlY = midY + perpY * d.curve * offsetDistance;
+        
+        // Position du texte sur la courbe (milieu de la courbe quadratique)
+        const t = 0.5;
+        const x = (1 - t) * (1 - t) * d.source.x + 2 * (1 - t) * t * controlX + t * t * d.target.x;
+        const y = (1 - t) * (1 - t) * d.source.y + 2 * (1 - t) * t * controlY + t * t * d.target.y;
+        
+        return { x, y };
+      }
+    };
+
+    // Ajouter les poids des arcs
+    const arcText = svg.append('g')
       .selectAll('text')
-      .data(links)
+      .data(arcs)
       .enter().append('text')
       .text(d => d.weight)
-      .attr('font-size', 20) // Augmentation de la taille de police
+      .attr('font-size', 16)
       .attr('font-weight', 'bold')
       .attr('fill', '#333')
       .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle');
-    
-    // Dessiner les nœuds avec une taille plus importante
+      .attr('dominant-baseline', 'middle')
+      .attr('x', d => getTextPosition(d).x)
+      .attr('y', d => getTextPosition(d).y);
+
+    // Dessiner les nœuds
     const node = svg.append('g')
       .selectAll('circle')
       .data(nodes)
@@ -117,75 +245,39 @@ const GraphVisualization = ({ vertices, edges, path, pathType }) => {
       .attr('stroke', '#d62728')
       .attr('stroke-width', 2)
       .attr('fill', d => {
-        // Colorer de la même façon le nœud de départ et d'arrivée
         if (d.id === 0 || d.id === 15) {
           return '#1f77b4'; // Bleu pour x1 et x16
         }
-        // Colorer les nœuds du chemin si un chemin est trouvé
         if (path && path.path) {
-          if (d.id === path.path[0]?.from) return '#1f77b4'; // Départ
-          if (d.id === path.path[path.path.length - 1]?.to) return '#1f77b4'; // Arrivée
-          if (path.path.some(p => p.from === d.id || p.to === d.id)) return '#ffcc00'; // Nœuds du chemin
+          if (d.id === path.path[0]?.from) return '#1f77b4';
+          if (d.id === path.path[path.path.length - 1]?.to) return '#1f77b4';
+          if (path.path.some(p => p.from === d.id || p.to === d.id)) return '#ffcc00';
         }
-        return 'white'; // Nœuds normaux en blanc avec contour rouge
-      });
-    
-    // Ajouter les étiquettes des nœuds avec une taille plus importante
+        return 'white';
+      })
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y);
+
+    // Ajouter les étiquettes des nœuds
     const nodeText = svg.append('g')
       .selectAll('text')
       .data(nodes)
       .enter().append('text')
       .text(d => `x${d.id + 1}`)
-      .attr('font-size', 14) // Augmentation de la taille de police
-      .attr('font-weight', 'bold') // Texte en gras
+      .attr('font-size', 14)
+      .attr('font-weight', 'bold')
       .attr('text-anchor', 'middle')
       .attr('dy', '.35em')
-      .attr('fill', d => {
-        // Texte en blanc pour les nœuds bleus, en noir pour les autres
-        return (d.id === 0 || d.id === 15) ? 'white' : 'black';
-      });
-    
-    // Positionner immédiatement tous les éléments
-    node
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y);
-    
-    nodeText
+      .attr('fill', d => (d.id === 0 || d.id === 15) ? 'white' : 'black')
       .attr('x', d => d.x)
       .attr('y', d => d.y);
-    
-    link
-      .attr('x1', d => d.source.x)
-      .attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x)
-      .attr('y2', d => d.target.y);
-    
-    // Positionner les textes des poids des liens avec un décalage plus important
-    linkText
-      .attr('x', d => {
-        const dx = d.target.x - d.source.x;
-        const dy = d.target.y - d.source.y;
-        const midX = (d.source.x + d.target.x) / 2;
-        // Décaler davantage le texte perpendiculairement à la ligne
-        return midX + (dy * 0.25) / Math.sqrt(dx * dx + dy * dy);
-      })
-      .attr('y', d => {
-        const dx = d.target.x - d.source.x;
-        const dy = d.target.y - d.source.y;
-        const midY = (d.source.y + d.target.y) / 2;
-        // Décaler davantage le texte perpendiculairement à la ligne
-        return midY - (dx * 0.25) / Math.sqrt(dx * dx + dy * dy);
-      });
-    
-    // Arrêter la simulation immédiatement
-    simulation.stop();
     
   }, [vertices, edges, path, pathType]);
 
   return (
     <div className="border rounded p-4 bg-white">
       <h2 className="font-bold mb-2">Visualisation du Graphe :</h2>
-      <svg ref={svgRef} className="w-full" style={{ minHeight: '500px' }}></svg>
+      <svg ref={svgRef} className="w-full" style={{ minHeight: '600px' }}></svg>
     </div>
   );
 };
