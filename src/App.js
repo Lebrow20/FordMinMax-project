@@ -1,23 +1,15 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+// Supprimez cette ligne si vous n'avez pas besoin de App.css
+// import './App.css';
+import GraphInterface from './components/GraphInterface';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="bg-gray-100 p-6">
+      <div className="container mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <h1 className="text-2xl font-bold mb-4 text-center">Graphe - Recherche de Chemins</h1>
+        <GraphInterface />
+      </div>
     </div>
   );
 }
