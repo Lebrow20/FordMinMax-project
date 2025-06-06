@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import GraphPath from '../utils/GraphPath';
+import GraphVisualization from './GraphVisualization';
 
 const GraphInterface = () => {
   const [vertexCount, setVertexCount] = useState(16);
@@ -9,6 +10,7 @@ const GraphInterface = () => {
   const [endVertex, setEndVertex] = useState(15);
   const [edgeWeight, setEdgeWeight] = useState(1);
   const [result, setResult] = useState('');
+  const [pathResult, setPathResult] = useState(null);
 
   useEffect(() => {
     addDefaultEdges();
@@ -78,6 +80,9 @@ const GraphInterface = () => {
 
     const paths = graph.findPath(parseInt(startVertex));
     const pathResult = graph.reconstructPath(parseInt(startVertex), parseInt(endVertex));
+
+    // Stocker le résultat du chemin pour la visualisation
+    setPathResult(pathResult);
 
     const resultText = `
 Chemin ${pathType === 'min' ? 'minimal' : 'maximal'} de x${parseInt(startVertex)+1} à x${parseInt(endVertex)+1}:
@@ -189,6 +194,16 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
             ))}
           </p>
         )}
+      </div>
+
+      {/* Ajouter la visualisation du graphe */}
+      <div className="mb-4">
+        <GraphVisualization 
+          vertices={vertexCount} 
+          edges={edges} 
+          path={pathResult} 
+          pathType={pathType} 
+        />
       </div>
 
       <div className="mt-4 p-4 bg-gray-50 rounded">
