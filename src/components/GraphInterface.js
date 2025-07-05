@@ -12,6 +12,8 @@ const GraphInterface = () => {
   const [edgeWeight, setEdgeWeight] = useState(1);
   const [result, setResult] = useState('');
   const [pathResult, setPathResult] = useState(null);
+  // Ajouter un nouvel état pour stocker les étapes de calcul
+  const [calculationSteps, setCalculationSteps] = useState([]);
 
   useEffect(() => {
     addDefaultEdges();
@@ -68,7 +70,7 @@ const GraphInterface = () => {
 
   const calculatePath = () => {
     const graph = new GraphPath(vertexCount, pathType);
-    
+
     // Ajouter toutes les arêtes
     edges.forEach(edge => {
       graph.addEdge(edge.source, edge.destination, edge.weight);
@@ -85,16 +87,69 @@ const GraphInterface = () => {
     // Stocker le résultat du chemin pour la visualisation
     setPathResult(pathResult);
 
+    // Transformer toutes les étapes de calcul pour le tableau
+    const allCalculationSteps = graph.allSteps.map(step => {
+      const i = step.from + 1; // +1 pour afficher x1 au lieu de x0
+      const j = step.to + 1;
+      const weight = step.weight;
+
+      // Formater les valeurs pour l'affichage
+      const prevValueDisplay = step.prevValue === Infinity ? '∞' :
+        step.prevValue === -Infinity ? '-∞' :
+          step.prevValue;
+      const newValueDisplay = step.newValue === Infinity ? '∞' :
+        step.newValue === -Infinity ? '-∞' :
+          step.newValue;
+
+      // Calculer λj - λi pour la comparaison selon l'algorithme
+      const lambdaI = step.from === parseInt(startVertex) ? 0 :
+        graph.allSteps.filter(s => s.to === step.from && s.isUpdated)
+          .reduce((latest, s) => s.iteration > latest.iteration ? s : latest, { iteration: 0 }).newValue ||
+        (pathType === 'min' ? Infinity : 0);
+
+      const formattedLambdaI = lambdaI === Infinity ? '∞' :
+        lambdaI === -Infinity ? '-∞' :
+          lambdaI;
+
+      // Calculer la différence λj - λi avec le résultat
+      let diffResult;
+      if (prevValueDisplay === '∞' || formattedLambdaI === '∞') {
+        diffResult = '∞';
+      } else if (prevValueDisplay === '-∞' || formattedLambdaI === '-∞') {
+        diffResult = '-∞';
+      } else {
+        diffResult = step.prevValue - lambdaI;
+      }
+
+      const diffValue = `${prevValueDisplay} - ${formattedLambdaI} = ${diffResult}`;
+
+      // Formater la nouvelle valeur selon l'algorithme
+      const valueUpdate = step.isUpdated ?
+        `${formattedLambdaI} + ${weight} = ${newValueDisplay}` :
+        prevValueDisplay;
+
+      return {
+        i,
+        j,
+        diffValue: diffValue,
+        weight,
+        newValue: valueUpdate,
+        isUpdated: step.isUpdated
+      };
+    });
+
+    setCalculationSteps(allCalculationSteps);
+
     const resultText = `
-Chemin ${pathType === 'min' ? 'minimal' : 'maximal'} de x${parseInt(startVertex)+1} à x${parseInt(endVertex)+1}:
+Chemin ${pathType === 'min' ? 'minimal' : 'maximal'} de x${parseInt(startVertex) + 1} à x${parseInt(endVertex) + 1}:
 
 Longueur totale : ${paths[endVertex]}
 
 Chemin :
-${[parseInt(startVertex), ...pathResult.path.map(p => p.to)].map(v => `x${v+1}`).join(' -> ')}
+${[parseInt(startVertex), ...pathResult.path.map(p => p.to)].map(v => `x${v + 1}`).join(' -> ')}
 
 Détails des étapes :
-${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.weight})`).join('\n')}`;
+${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${step.weight})`).join('\n')}`;
 
     setResult(resultText);
   };
@@ -103,25 +158,43 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
   const vertexOptions = [];
   for (let i = 0; i < vertexCount; i++) {
     vertexOptions.push(
-      <option key={i} value={i}>{`x${i+1}`}</option>
+      <option key={i} value={i}>{`x${i + 1}`}</option>
     );
   }
 
   const handleEdgeUpdate = (updatedEdge) => {
-    const newEdges = edges.map(edge => {
-      if (edge.source === updatedEdge.source && edge.destination === updatedEdge.destination) {
-        return updatedEdge;
-      }
-      return edge;
-    });
-    setEdges(newEdges);
+    // Ouvrir directement la popup SweetAlert2
+    openEditPopup(updatedEdge);
   };
 
   const handleEdgeDelete = (edgeToDelete) => {
-    const newEdges = edges.filter(edge => 
-      !(edge.source === edgeToDelete.source && edge.destination === edgeToDelete.destination)
+    // Ouvrir directement la popup de confirmation
+    openDeletePopup(edgeToDelete);
+  };
+
+  // Fonction pour mettre à jour l'arc après confirmation dans la popup
+  const updateEdge = (edge, newWeight) => {
+    const newEdges = edges.map(e => {
+      if (e.source === edge.source && e.destination === edge.destination) {
+        return { ...e, weight: newWeight };
+      }
+      return e;
+    });
+    setEdges(newEdges);
+
+    // Recalculer automatiquement le chemin
+    setTimeout(() => calculatePath(), 100);
+  };
+
+  // Fonction pour supprimer l'arc après confirmation
+  const deleteEdge = (edge) => {
+    const newEdges = edges.filter(e =>
+      !(e.source === edge.source && e.destination === edge.destination)
     );
     setEdges(newEdges);
+
+    // Recalculer automatiquement le chemin
+    setTimeout(() => calculatePath(), 100);
   };
 
   // Fonction pour ouvrir la popup de modification avec SweetAlert2
@@ -150,16 +223,14 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
       }
     }).then((result) => {
       if (result.isConfirmed) {
-        const updatedEdge = {
-          ...edge,
-          weight: result.value
-        };
-        handleEdgeUpdate(updatedEdge);
-        Swal.fire(
-          'Mis à jour!',
-          `L'arc a été modifié avec un poids de ${result.value}.`,
-          'success'
-        );
+        updateEdge(edge, result.value);
+        Swal.fire({
+          title: 'Mis à jour!',
+          text: `L'arc a été modifié avec un poids de ${result.value}.`,
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        });
       }
     });
   };
@@ -177,90 +248,101 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
       cancelButtonColor: '#3085d6',
     }).then((result) => {
       if (result.isConfirmed) {
-        handleEdgeDelete(edge);
-        Swal.fire(
-          'Supprimé!',
-          'L\'arc a été supprimé.',
-          'success'
-        );
+        deleteEdge(edge);
+        Swal.fire({
+          title: 'Supprimé!',
+          text: 'L\'arc a été supprimé.',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        });
       }
     });
   };
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <label className="block mb-2">Nombre de Sommets :</label>
-          <input 
-            type="number" 
-            min="2" 
-            max="20" 
-            className="w-full p-2 border rounded" 
-            value={vertexCount}
-            onChange={(e) => setVertexCount(parseInt(e.target.value))}
-          />
+      {/* Partie fixe en haut de l'écran */}
+      <div className="fixed top-0 left-0 right-0 bg-white z-10 p-4 shadow-md overflow-x-auto">
+        <h1 className="text-2xl font-bold text-center mb-4">Graphe - Recherche de Chemins</h1>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block mb-2">Nombre de Sommets :</label>
+            <input
+              type="number"
+              min="2"
+              max="20"
+              className="w-full p-2 border rounded"
+              value={vertexCount}
+              onChange={(e) => setVertexCount(parseInt(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="block mb-2">Type de Chemin :</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={pathType}
+              onChange={(e) => setPathType(e.target.value)}
+            >
+              <option value="min">Chemin Minimal</option>
+              <option value="max">Chemin Maximal</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="block mb-2">Type de Chemin :</label>
-          <select 
-            className="w-full p-2 border rounded"
-            value={pathType}
-            onChange={(e) => setPathType(e.target.value)}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block mb-2">Sommet Départ :</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={startVertex}
+              onChange={(e) => setStartVertex(parseInt(e.target.value))}
+            >
+              {vertexOptions}
+            </select>
+          </div>
+          <div>
+            <label className="block mb-2">Sommet Arrivée :</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={endVertex}
+              onChange={(e) => setEndVertex(parseInt(e.target.value))}
+            >
+              {vertexOptions}
+            </select>
+          </div>
+          <div>
+            <label className="block mb-2">Poids de l'Arête :</label>
+            <input
+              type="number"
+              className="w-full p-2 border rounded"
+              value={edgeWeight}
+              onChange={(e) => setEdgeWeight(parseInt(e.target.value))}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <button
+            className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+            onClick={handleAddEdge}
           >
-            <option value="min">Chemin Minimal</option>
-            <option value="max">Chemin Maximal</option>
-          </select>
+            Ajouter Arête
+          </button>
+          <button
+            className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
+            onClick={calculatePath}
+          >
+            Trouver Chemin
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <div>
-          <label className="block mb-2">Sommet Départ :</label>
-          <select 
-            className="w-full p-2 border rounded"
-            value={startVertex}
-            onChange={(e) => setStartVertex(parseInt(e.target.value))}
-          >
-            {vertexOptions}
-          </select>
-        </div>
-        <div>
-          <label className="block mb-2">Sommet Arrivée :</label>
-          <select 
-            className="w-full p-2 border rounded"
-            value={endVertex}
-            onChange={(e) => setEndVertex(parseInt(e.target.value))}
-          >
-            {vertexOptions}
-          </select>
-        </div>
-        <div>
-          <label className="block mb-2">Poids de l'Arête :</label>
-          <input 
-            type="number" 
-            className="w-full p-2 border rounded" 
-            value={edgeWeight}
-            onChange={(e) => setEdgeWeight(parseInt(e.target.value))}
-          />
-        </div>
-      </div>
+      {/* Espace pour compenser la hauteur de la partie fixe */}
+      <div className="pt-[280px] md:pt-[240px] sm:pt-[320px]"></div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <button 
-          className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-          onClick={handleAddEdge}
-        >
-          Ajouter Arête
-        </button>
-        <button 
-          className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
-          onClick={calculatePath}
-        >
-          Trouver Chemin
-        </button>
-      </div>
-
+      {/* Contenu défilable */}
       <div className="mb-4 border p-2 min-h-[100px] bg-gray-50 rounded">
         {edges.length === 0 ? (
           <p className="text-gray-500">Arêtes du graphe : (aucune)</p>
@@ -271,10 +353,10 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
               {edges.map((edge, index) => (
                 <div key={index} className="flex items-center justify-between p-2 bg-white rounded shadow-sm hover:bg-blue-50">
                   <span className="font-medium">
-                    x{edge.source+1} <span className="text-blue-500">→</span> x{edge.destination+1} <span className="text-gray-600 ml-2">(poids: {edge.weight})</span>
+                    x{edge.source + 1} <span className="text-blue-500">→</span> x{edge.destination + 1} <span className="text-gray-600 ml-2">(poids: {edge.weight})</span>
                   </span>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm flex items-center"
                       onClick={() => openEditPopup(edge)}
                     >
@@ -283,7 +365,7 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
                       </svg>
                       Modifier
                     </button>
-                    <button 
+                    <button
                       className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm flex items-center"
                       onClick={() => openDeletePopup(edge)}
                     >
@@ -302,15 +384,46 @@ ${pathResult.path.map(step => `x${step.from+1} -> x${step.to+1} (poids: ${step.w
 
       {/* Ajouter la visualisation du graphe */}
       <div className="mb-4">
-        <GraphVisualization 
-          vertices={vertexCount} 
-          edges={edges} 
-          path={pathResult} 
-          pathType={pathType} 
+        <GraphVisualization
+          vertices={vertexCount}
+          edges={edges}
+          path={pathResult}
+          pathType={pathType}
           onEdgeUpdate={handleEdgeUpdate}
           onEdgeDelete={handleEdgeDelete}
         />
       </div>
+
+      {/* Tableau des étapes de calcul */}
+      {calculationSteps.filter(step => step.isUpdated).length > 0 && (
+        <div className="mt-4 mb-4 overflow-x-auto">
+          <h2 className="font-bold mb-2">Étapes de calcul :</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full bg-white border border-gray-300">
+              <thead>
+                <tr className="bg-green-500 text-white">
+                  <th className="py-2 px-4 border">i</th>
+                  <th className="py-2 px-4 border">j</th>
+                  <th className="py-2 px-4 border">λ<sub>j</sub> - λ<sub>i</sub></th>
+                  <th className="py-2 px-4 border">v(x<sub>i</sub>, x<sub>j</sub>)</th>
+                  <th className="py-2 px-4 border">λ<sub>j</sub> = λ<sub>i</sub> + v(x<sub>i</sub>, x<sub>j</sub>)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calculationSteps.filter(step => step.isUpdated).map((step, index) => (
+                  <tr key={index} className="border hover:bg-gray-50 bg-green-100">
+                    <td className="py-2 px-4 border text-center">{step.i}</td>
+                    <td className="py-2 px-4 border text-center">{step.j}</td>
+                    <td className="py-2 px-4 border text-center">{step.diffValue}</td>
+                    <td className="py-2 px-4 border text-center">{step.weight}</td>
+                    <td className="py-2 px-4 border">{step.newValue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 p-4 bg-gray-50 rounded">
         <h2 className="font-bold mb-2">Résultats :</h2>

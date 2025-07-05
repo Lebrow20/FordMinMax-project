@@ -6,26 +6,41 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [editWeight, setEditWeight] = useState('');
 
-  useEffect(() => {
-    if (!edges.length) return;
+  // Fonction pour gérer le redimensionnement
+  const handleResize = () => {
+    if (!edges.length || !svgRef.current) return;
+    renderGraph();
+  };
+
+  // Fonction principale de rendu du graphe
+  const renderGraph = () => {
+    if (!edges.length || !svgRef.current) return;
 
     // Nettoyer le SVG précédent
     d3.select(svgRef.current).selectAll("*").remove();
 
-    const width = 1200;
-    const height = 600;
-    const nodeRadius = 30;
+    // Obtenir les dimensions du conteneur parent
+    const containerWidth = svgRef.current.parentElement.clientWidth;
+    const width = Math.min(containerWidth, 1200); // Limiter à 1200px max
+    const height = Math.min(width / 2, 600); // Maintenir un ratio de 2:1, max 600px
+    const nodeRadius = Math.max(15, Math.min(30, width / 40)); // Rayon adaptatif entre 15 et 30px
 
-    // Créer le SVG
+    // Facteur d'échelle pour adapter les positions des nœuds
+    const scaleX = width / 1200;
+    const scaleY = height / 600;
+
+    // Créer le SVG avec viewBox pour le rendre responsive
     const svg = d3.select(svgRef.current)
-      .attr('width', width)
-      .attr('height', height);
+      .attr('width', '100%')
+      .attr('height', height)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     // Créer les données pour les nœuds
     const nodes = Array.from({ length: vertices }, (_, i) => ({ id: i }));
 
-    // Définir des positions fixes pour chaque nœud
-    const nodePositions = {
+    // Définir des positions fixes pour chaque nœud (positions de base pour 1200x600)
+    const baseNodePositions = {
       0: { x: 70, y: 250 },     // x1 (bleu)
       1: { x: 200, y: 250 },    // x2
       2: { x: 300, y: 350 },    // x3
@@ -43,6 +58,15 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       14: { x: 950, y: 180 },   // x15
       15: { x: 1100, y: 250 }   // x16 (bleu)
     };
+
+    // Adapter les positions en fonction du facteur d'échelle
+    const nodePositions = {};
+    Object.keys(baseNodePositions).forEach(id => {
+      nodePositions[id] = {
+        x: baseNodePositions[id].x * scaleX,
+        y: baseNodePositions[id].y * scaleY
+      };
+    });
 
     // Appliquer les positions fixes aux nœuds
     nodes.forEach(node => {
@@ -169,7 +193,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .data(arcs)
       .enter().append('path')
       .attr('d', createArcPath)
-      .attr('stroke-width', 1) // Augmenter légèrement l'épaisseur pour faciliter le clic
+      .attr('stroke-width', 1)
       .attr('stroke', d => {
         if (d.isPathEdge) {
           return pathType === 'min' ? '#ff0000' : '#00ff00';
@@ -183,7 +207,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
         }
         return 'url(#arrow-normal)';
       })
-      .style('cursor', 'pointer') // Changer le curseur pour indiquer que c'est cliquable
+      .style('cursor', 'pointer')
       .on('click', (event, d) => {
         // Trouver l'arête correspondante dans le tableau edges
         const edge = edges.find(e =>
@@ -191,14 +215,14 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
           e.destination === d.targetId
         );
 
-        if (edge) {
-          setSelectedEdge(edge);
-          setEditWeight(edge.weight.toString());
+        if (edge && onEdgeUpdate) {
+          // Appeler directement la fonction de popup du parent
+          onEdgeUpdate(edge);
         }
       })
       .on('mouseover', function () {
         d3.select(this)
-          .attr('stroke-width', 1) // Épaissir l'arc au survol
+          .attr('stroke-width', 1)
           .attr('stroke-opacity', 0.8);
       })
       .on('mouseout', function () {
@@ -260,7 +284,30 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('dominant-baseline', 'middle')
       .attr('x', d => getTextPosition(d).x)
       .attr('y', d => getTextPosition(d).y)
-      .style('pointer-events', 'none'); // Éviter que le texte n'interfère avec les clics sur l'arc
+      .style('pointer-events', 'auto')
+      .style('cursor', 'pointer')
+      .on('click', (event, d) => {
+        // Trouver l'arête correspondante dans le tableau edges
+        const edge = edges.find(e =>
+          e.source === d.sourceId &&
+          e.destination === d.targetId
+        );
+
+        if (edge && onEdgeUpdate) {
+          // Appeler directement la fonction de popup du parent
+          onEdgeUpdate(edge);
+        }
+      })
+      .on('mouseover', function () {
+        d3.select(this)
+          .attr('font-size', 18)
+          .attr('fill', '#0066cc');
+      })
+      .on('mouseout', function () {
+        d3.select(this)
+          .attr('font-size', 16)
+          .attr('fill', '#333');
+      });
 
     // Dessiner les nœuds
     const node = svg.append('g')
@@ -298,7 +345,20 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('x', d => d.x)
       .attr('y', d => d.y);
 
-  }, [vertices, edges, path, pathType, setSelectedEdge]);
+  };
+
+  useEffect(() => {
+    // Rendu initial du graphe
+    renderGraph();
+
+    // Ajouter un écouteur d'événement pour le redimensionnement
+    window.addEventListener('resize', handleResize);
+
+    // Nettoyer l'écouteur lors du démontage du composant
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [vertices, edges, path, pathType]); // Dépendances du useEffect
 
   const handleUpdateEdge = () => {
     if (selectedEdge && onEdgeUpdate) {
@@ -322,46 +382,11 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
   };
 
   return (
-    <div className="border rounded p-4 bg-white">
+    <div className="border rounded p-4 bg-white w-full overflow-hidden">
       <h2 className="font-bold mb-2">Visualisation du Graphe :</h2>
-      <svg ref={svgRef} className="w-full" style={{ minHeight: '600px' }}></svg>
-
-      {selectedEdge && (
-        <div className="mt-4 p-4 bg-gray-100 rounded">
-          <h3 className="font-bold mb-2">Modifier l'arc : x{selectedEdge.source + 1} → x{selectedEdge.destination + 1}</h3>
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="block mb-1">Poids :</label>
-              <input
-                type="number"
-                className="p-2 border rounded"
-                value={editWeight}
-                onChange={(e) => setEditWeight(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                onClick={handleUpdateEdge}
-              >
-                Mettre à jour
-              </button>
-              <button
-                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                onClick={handleDeleteEdge}
-              >
-                Supprimer
-              </button>
-              <button
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-                onClick={handleCancel}
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="w-full overflow-auto">
+        <svg ref={svgRef} className="w-full" style={{ minHeight: '400px', maxHeight: '80vh' }}></svg>
+      </div>
     </div>
   );
 };
