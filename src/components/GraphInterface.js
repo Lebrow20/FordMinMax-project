@@ -410,13 +410,13 @@ ${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${st
                 </tr>
               </thead>
               <tbody>
-                {calculationSteps.filter(step => step.isUpdated).map((step, index) => (
+                {calculationSteps.filter(step => step.isUpdated).sort((a, b) => a.i - b.i).map((step, index) => (
                   <tr key={index} className="border hover:bg-gray-50 bg-green-100">
                     <td className="py-2 px-4 border text-center">{step.i}</td>
                     <td className="py-2 px-4 border text-center">{step.j}</td>
-                    <td className="py-2 px-4 border text-center">{step.diffValue}</td>
+                    <td className="py-2 px-4 border text-center">λ<sub>{step.j}</sub> - λ<sub>{step.i}</sub> = {step.diffValue}</td>
                     <td className="py-2 px-4 border text-center">{step.weight}</td>
-                    <td className="py-2 px-4 border">{step.newValue}</td>
+                    <td className="py-2 px-4 border">λ<sub>{step.j}</sub> = {step.newValue}</td>
                   </tr>
                 ))}
               </tbody>
