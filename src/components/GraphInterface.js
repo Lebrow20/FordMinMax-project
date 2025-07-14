@@ -14,6 +14,7 @@ const GraphInterface = () => {
   const [pathResult, setPathResult] = useState(null);
   // Ajouter un nouvel état pour stocker les étapes de calcul
   const [calculationSteps, setCalculationSteps] = useState([]);
+  const [lambdas, setLambdas] = useState([]);
 
   useEffect(() => {
     addDefaultEdges();
@@ -82,6 +83,7 @@ const GraphInterface = () => {
     }
 
     const paths = graph.findPath(parseInt(startVertex));
+    setLambdas(paths); // <-- Ajouté ici
     const pathResult = graph.reconstructPath(parseInt(startVertex), parseInt(endVertex));
 
     // Stocker le résultat du chemin pour la visualisation
@@ -275,7 +277,10 @@ ${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${st
               max="20"
               className="w-full p-2 border rounded"
               value={vertexCount}
-              onChange={(e) => setVertexCount(parseInt(e.target.value))}
+              onChange={(e) => {
+                const val = Math.max(2, parseInt(e.target.value) || 2);
+                setVertexCount(val);
+              }}
             />
           </div>
           <div>
@@ -316,9 +321,13 @@ ${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${st
             <label className="block mb-2">Poids de l'Arête :</label>
             <input
               type="number"
+              min="1"
               className="w-full p-2 border rounded"
               value={edgeWeight}
-              onChange={(e) => setEdgeWeight(parseInt(e.target.value))}
+              onChange={(e) => {
+                const val = Math.max(1, parseInt(e.target.value) || 1);
+                setEdgeWeight(val);
+              }}
             />
           </div>
         </div>
@@ -391,6 +400,7 @@ ${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${st
           pathType={pathType}
           onEdgeUpdate={handleEdgeUpdate}
           onEdgeDelete={handleEdgeDelete}
+          lambdas={lambdas}
         />
       </div>
 

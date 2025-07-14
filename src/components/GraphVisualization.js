@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 
-const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onEdgeDelete }) => {
+const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onEdgeDelete, lambdas }) => {
   const svgRef = useRef(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [editWeight, setEditWeight] = useState('');
+  // Ajout d'un état pour stocker les positions personnalisées
+  const [customPositions, setCustomPositions] = useState({});
 
   // Fonction pour gérer le redimensionnement
   const handleResize = () => {
@@ -16,59 +18,85 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
   const renderGraph = () => {
     if (!edges.length || !svgRef.current) return;
 
-    // Nettoyer le SVG précédent
     d3.select(svgRef.current).selectAll("*").remove();
 
-    // Obtenir les dimensions du conteneur parent
     const containerWidth = svgRef.current.parentElement.clientWidth;
-    const width = Math.min(containerWidth, 1200); // Limiter à 1200px max
-    const height = Math.min(width / 2, 600); // Maintenir un ratio de 2:1, max 600px
-    const nodeRadius = Math.max(15, Math.min(30, width / 40)); // Rayon adaptatif entre 15 et 30px
+    const width = Math.min(containerWidth, 1200);
+    const height = Math.min(width / 2, 600);
+    const nodeRadius = Math.max(15, Math.min(30, width / 40));
 
-    // Facteur d'échelle pour adapter les positions des nœuds
     const scaleX = width / 1200;
     const scaleY = height / 600;
 
-    // Créer le SVG avec viewBox pour le rendre responsive
     const svg = d3.select(svgRef.current)
       .attr('width', '100%')
       .attr('height', height)
       .attr('viewBox', `0 0 ${width} ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet');
 
-    // Créer les données pour les nœuds
     const nodes = Array.from({ length: vertices }, (_, i) => ({ id: i }));
 
-    // Définir des positions fixes pour chaque nœud (positions de base pour 1200x600)
-    const baseNodePositions = {
-      0: { x: 70, y: 250 },     // x1 (bleu)
-      1: { x: 200, y: 250 },    // x2
-      2: { x: 300, y: 350 },    // x3
-      3: { x: 300, y: 150 },    // x4
-      4: { x: 450, y: 120 },    // x5
-      5: { x: 450, y: 250 },    // x6
-      6: { x: 550, y: 280 },    // x7
-      7: { x: 650, y: 180 },    // x8
-      8: { x: 550, y: 120 },    // x9
-      9: { x: 650, y: 280 },    // x10
-      10: { x: 550, y: 400 },   // x11
-      11: { x: 750, y: 280 },   // x12
-      12: { x: 750, y: 400 },   // x13
-      13: { x: 850, y: 280 },   // x14
-      14: { x: 950, y: 180 },   // x15
-      15: { x: 1100, y: 250 }   // x16 (bleu)
-    };
+    let baseNodePositions = {};
+    if (vertices <= 16) {
+      baseNodePositions = {
+        0: { x: 70, y: 250 },
+        1: { x: 200, y: 250 },
+        2: { x: 300, y: 350 },
+        3: { x: 300, y: 150 },
+        4: { x: 450, y: 120 },
+        5: { x: 450, y: 250 },
+        6: { x: 550, y: 280 },
+        7: { x: 650, y: 180 },
+        8: { x: 550, y: 120 },
+        9: { x: 650, y: 280 },
+        10: { x: 550, y: 400 },
+        11: { x: 750, y: 280 },
+        12: { x: 750, y: 400 },
+        13: { x: 850, y: 280 },
+        14: { x: 950, y: 180 },
+        15: { x: 1100, y: 250 }
+      };
+    } else if (vertices >= 17 && vertices <= 20) {
+      baseNodePositions = {
+        0: { x: 70, y: 250 },
+        1: { x: 200, y: 80 },
+        2: { x: 200, y: 420 },
+        3: { x: 350, y: 80 },
+        4: { x: 350, y: 250 },
+        5: { x: 350, y: 420 },
+        6: { x: 500, y: 80 },
+        7: { x: 500, y: 250 },
+        8: { x: 500, y: 420 },
+        9: { x: 650, y: 80 },
+        10: { x: 650, y: 250 },
+        11: { x: 650, y: 420 },
+        12: { x: 800, y: 80 },
+        13: { x: 800, y: 250 },
+        14: { x: 800, y: 420 },
+        15: { x: 950, y: 80 },
+        16: { x: 950, y: 250 },
+        17: { x: 950, y: 420 },
+        18: { x: 1100, y: 150 },
+        19: { x: 1100, y: 350 }
+      };
+    } else {
+      // Pour les autres cas, tu peux garder la logique dynamique ou adapter selon besoin
+      // ...placement dynamique...
+    }
 
-    // Adapter les positions en fonction du facteur d'échelle
+    // Utiliser la position personnalisée si elle existe, sinon la position de base
     const nodePositions = {};
     Object.keys(baseNodePositions).forEach(id => {
-      nodePositions[id] = {
-        x: baseNodePositions[id].x * scaleX,
-        y: baseNodePositions[id].y * scaleY
-      };
+      if (customPositions[id]) {
+        nodePositions[id] = customPositions[id];
+      } else {
+        nodePositions[id] = {
+          x: baseNodePositions[id].x * scaleX,
+          y: baseNodePositions[id].y * scaleY
+        };
+      }
     });
 
-    // Appliquer les positions fixes aux nœuds
     nodes.forEach(node => {
       if (nodePositions[node.id]) {
         node.x = nodePositions[node.id].x;
@@ -90,25 +118,19 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
 
     // Détecter les arcs bidirectionnels et ajuster leur courbure
     arcs.forEach((arc, i) => {
-      // Chercher un arc inverse
       const reverseArc = arcs.find((other, j) =>
         j !== i &&
         other.sourceId === arc.targetId &&
         other.targetId === arc.sourceId
       );
-
       if (reverseArc) {
-        // Si c'est le premier arc de la paire (index plus petit), courber vers le haut
-        // Si c'est le second arc, courber vers le bas
         const isFirstArc = arcs.indexOf(arc) < arcs.indexOf(reverseArc);
         arc.curve = isFirstArc ? -0.15 : 0.15;
       } else {
-        // Arc simple, pas de courbure
         arc.curve = 0;
       }
     });
 
-    // Marquer les arcs qui font partie du chemin
     if (path && path.path) {
       arcs.forEach(arc => {
         arc.isPathEdge = path.path.some(p =>
@@ -117,10 +139,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       });
     }
 
-    // Définir les marqueurs de flèches avec différentes couleurs
     const defs = svg.append('defs');
-
-    // Flèche normale
     defs.append('marker')
       .attr('id', 'arrow-normal')
       .attr('viewBox', '0 -5 10 10')
@@ -132,8 +151,6 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#666');
-
-    // Flèche pour chemin minimal (rouge)
     defs.append('marker')
       .attr('id', 'arrow-min')
       .attr('viewBox', '0 -5 10 10')
@@ -145,8 +162,6 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#ff0000');
-
-    // Flèche pour chemin maximal (vert)
     defs.append('marker')
       .attr('id', 'arrow-max')
       .attr('viewBox', '0 -5 10 10')
@@ -159,36 +174,25 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#00ff00');
 
-    // Fonction pour créer le chemin d'arc courbe
     const createArcPath = (d) => {
       if (d.curve === 0) {
-        // Arc droit
         return `M ${d.source.x} ${d.source.y} L ${d.target.x} ${d.target.y}`;
       } else {
-        // Arc courbe - utiliser une courbure plus subtile
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-
-        // Point de contrôle au milieu avec un décalage perpendiculaire
         const midX = (d.source.x + d.target.x) / 2;
         const midY = (d.source.y + d.target.y) / 2;
-
-        // Vecteur perpendiculaire normalisé
         const perpX = -dy / distance;
         const perpY = dx / distance;
-
-        // Décalage du point de contrôle (plus petit pour une courbure subtile)
-        const offsetDistance = Math.min(distance * 0.2, 40); // Limiter le décalage
+        const offsetDistance = Math.min(distance * 0.2, 40);
         const controlX = midX + perpX * d.curve * offsetDistance;
         const controlY = midY + perpY * d.curve * offsetDistance;
-
         return `M ${d.source.x} ${d.source.y} Q ${controlX} ${controlY} ${d.target.x} ${d.target.y}`;
       }
     };
 
-    // Dessiner les arcs
-    const pathElements = svg.append('g')
+    svg.append('g')
       .selectAll('path')
       .data(arcs)
       .enter().append('path')
@@ -209,14 +213,11 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       })
       .style('cursor', 'pointer')
       .on('click', (event, d) => {
-        // Trouver l'arête correspondante dans le tableau edges
         const edge = edges.find(e =>
           e.source === d.sourceId &&
           e.destination === d.targetId
         );
-
         if (edge && onEdgeUpdate) {
-          // Appeler directement la fonction de popup du parent
           onEdgeUpdate(edge);
         }
       })
@@ -231,48 +232,36 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
           .attr('stroke-opacity', 1);
       });
 
-    // Fonction pour calculer la position du texte sur l'arc courbe
     const getTextPosition = (d) => {
       if (d.curve === 0) {
-        // Position pour arc droit avec petit décalage
         const midX = (d.source.x + d.target.x) / 2;
         const midY = (d.source.y + d.target.y) / 2;
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-
         return {
           x: midX + (dy * 12) / distance,
           y: midY - (dx * 12) / distance
         };
       } else {
-        // Position pour arc courbe
         const dx = d.target.x - d.source.x;
         const dy = d.target.y - d.source.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-
         const midX = (d.source.x + d.target.x) / 2;
         const midY = (d.source.y + d.target.y) / 2;
-
         const perpX = -dy / distance;
         const perpY = dx / distance;
-
-        // Même calcul que pour l'arc mais pour le texte
         const offsetDistance = Math.min(distance * 0.2, 40);
         const controlX = midX + perpX * d.curve * offsetDistance;
         const controlY = midY + perpY * d.curve * offsetDistance;
-
-        // Position du texte sur la courbe (milieu de la courbe quadratique)
         const t = 0.5;
         const x = (1 - t) * (1 - t) * d.source.x + 2 * (1 - t) * t * controlX + t * t * d.target.x;
         const y = (1 - t) * (1 - t) * d.source.y + 2 * (1 - t) * t * controlY + t * t * d.target.y;
-
         return { x, y };
       }
     };
 
-    // Ajouter les poids des arcs
-    const arcText = svg.append('g')
+    svg.append('g')
       .selectAll('text')
       .data(arcs)
       .enter().append('text')
@@ -287,14 +276,11 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .style('pointer-events', 'auto')
       .style('cursor', 'pointer')
       .on('click', (event, d) => {
-        // Trouver l'arête correspondante dans le tableau edges
         const edge = edges.find(e =>
           e.source === d.sourceId &&
           e.destination === d.targetId
         );
-
         if (edge && onEdgeUpdate) {
-          // Appeler directement la fonction de popup du parent
           onEdgeUpdate(edge);
         }
       })
@@ -309,8 +295,26 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
           .attr('fill', '#333');
       });
 
-    // Dessiner les nœuds
-    const node = svg.append('g')
+    // --- DRAG & DROP POUR LES NOEUDS ---
+    function drag(simNodes) {
+      return d3.drag()
+        .on('start', function (event, d) {
+          d3.select(this).raise().attr('stroke', '#222');
+        })
+        .on('drag', function (event, d) {
+          d.x = Math.max(nodeRadius, Math.min(width - nodeRadius, event.x));
+          d.y = Math.max(nodeRadius, Math.min(height - nodeRadius, event.y));
+          setCustomPositions(prev => ({
+            ...prev,
+            [d.id]: { x: d.x, y: d.y }
+          }));
+        })
+        .on('end', function (event, d) {
+          d3.select(this).attr('stroke', '#d62728');
+        });
+    }
+
+    svg.append('g')
       .selectAll('circle')
       .data(nodes)
       .enter().append('circle')
@@ -319,7 +323,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('stroke-width', 2)
       .attr('fill', d => {
         if (d.id === 0 || d.id === 15) {
-          return '#1f77b4'; // Bleu pour x1 et x16
+          return '#1f77b4';
         }
         if (path && path.path) {
           if (d.id === path.path[0]?.from) return '#1f77b4';
@@ -329,13 +333,15 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
         return 'white';
       })
       .attr('cx', d => d.x)
-      .attr('cy', d => d.y);
+      .attr('cy', d => d.y)
+      .call(drag(nodes));
 
-    // Ajouter les étiquettes des nœuds
-    const nodeText = svg.append('g')
-      .selectAll('text')
+    // Affichage du nom des sommets
+    svg.append('g')
+      .selectAll('text.node-label')
       .data(nodes)
       .enter().append('text')
+      .attr('class', 'node-label')
       .text(d => `x${d.id + 1}`)
       .attr('font-size', 14)
       .attr('font-weight', 'bold')
@@ -345,20 +351,36 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('x', d => d.x)
       .attr('y', d => d.y);
 
+    // Affichage des valeurs lambda en rouge au-dessus de chaque sommet
+    if (lambdas && Array.isArray(lambdas)) {
+      svg.append('g')
+        .selectAll('text.lambda-label')
+        .data(nodes)
+        .enter().append('text')
+        .attr('class', 'lambda-label')
+        .text(d => `λ${d.id + 1} = ${lambdas[d.id] !== undefined && lambdas[d.id] !== Infinity ? lambdas[d.id] : (lambdas[d.id] === Infinity ? '∞' : '')}`)
+        .attr('font-size', 16)
+        .attr('font-weight', 'bold')
+        .attr('fill', 'red')
+        .attr('text-anchor', 'middle')
+        .attr('x', d => d.x)
+        .attr('y', d => d.y - nodeRadius - 12); // Positionné au-dessus du sommet
+    }
   };
 
+  // Mettre à jour le graphe à chaque changement de positions personnalisées
   useEffect(() => {
-    // Rendu initial du graphe
     renderGraph();
+    // eslint-disable-next-line
+  }, [vertices, edges, path, pathType, customPositions]);
 
-    // Ajouter un écouteur d'événement pour le redimensionnement
+  useEffect(() => {
     window.addEventListener('resize', handleResize);
-
-    // Nettoyer l'écouteur lors du démontage du composant
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [vertices, edges, path, pathType]); // Dépendances du useEffect
+    // eslint-disable-next-line
+  }, [edges.length]);
 
   const handleUpdateEdge = () => {
     if (selectedEdge && onEdgeUpdate) {
