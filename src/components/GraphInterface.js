@@ -336,12 +336,32 @@ ${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${st
           <button
             className="bg-gray-400 text-white p-2 rounded hover:bg-gray-500"
             onClick={() => {
-              setEdges([]);
-              setResult('');
-              setPathResult(null);
-              setCalculationSteps([]);
-              setLambdas([]);
-              setEdgeWeight(1);
+              Swal.fire({
+                title: 'Réinitialiser le graphe ?',
+                text: "Toutes les arêtes, résultats et valeurs seront supprimés.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Oui, réinitialiser',
+                cancelButtonText: 'Annuler',
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  setEdges([]);
+                  setResult('');
+                  setPathResult(null);
+                  setCalculationSteps([]);
+                  setLambdas([]);
+                  setEdgeWeight(1);
+                  Swal.fire({
+                    title: 'Réinitialisé !',
+                    text: 'Le graphe et les résultats ont été réinitialisés.',
+                    icon: 'success',
+                    timer: 1200,
+                    showConfirmButton: false
+                  });
+                }
+              });
             }}
           >
             Réinitialiser
