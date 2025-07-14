@@ -1,6 +1,6 @@
 import React from 'react';
 // Supprimez cette ligne si vous n'avez pas besoin de App.css
-// import './App.css';
+import './App.css';
 import GraphInterface from './components/GraphInterface';
 
 function App() {

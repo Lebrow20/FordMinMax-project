@@ -1,6 +1,10 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 
+// Couleurs personnalisées pour le thème
+const customRed = '#1b8fff';   // Rouge attractif
+const customGreen = '#43aa8b'; // Vert personnalisé
+
 const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onEdgeDelete, lambdas }) => {
   const svgRef = useRef(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
@@ -161,7 +165,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', '#ff0000');
+      .attr('fill', '#43aa8b');
     defs.append('marker')
       .attr('id', 'arrow-max')
       .attr('viewBox', '0 -5 10 10')
@@ -172,7 +176,7 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', '#00ff00');
+      .attr('fill', '#e63946');
 
     const createArcPath = (d) => {
       if (d.curve === 0) {
@@ -200,9 +204,9 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('stroke-width', 1)
       .attr('stroke', d => {
         if (d.isPathEdge) {
-          return pathType === 'min' ? '#ff0000' : '#00ff00';
+          return pathType === 'min' ? customGreen : customRed;
         }
-        return '#999';
+        return '#90caf9'; // bleu clair pour les autres arcs
       })
       .attr('fill', 'none')
       .attr('marker-end', d => {
@@ -323,12 +327,14 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('stroke-width', 2)
       .attr('fill', d => {
         if (d.id === 0 || d.id === 15) {
-          return '#1f77b4';
+          return '#1976d2'; // bleu foncé pour début/fin
         }
         if (path && path.path) {
-          if (d.id === path.path[0]?.from) return '#1f77b4';
-          if (d.id === path.path[path.path.length - 1]?.to) return '#1f77b4';
-          if (path.path.some(p => p.from === d.id || p.to === d.id)) return '#ffcc00';
+          if (d.id === path.path[0]?.from) return '#1976d2';
+          if (d.id === path.path[path.path.length - 1]?.to) return '#1976d2';
+          if (path.path.some(p => p.from === d.id || p.to === d.id)) {
+            return pathType === 'min' ? customGreen : customRed;
+          }
         }
         return 'white';
       })
@@ -347,24 +353,39 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
       .attr('font-weight', 'bold')
       .attr('text-anchor', 'middle')
       .attr('dy', '.35em')
-      .attr('fill', d => (d.id === 0 || d.id === 15) ? 'white' : 'black')
+      .attr('fill', d => (d.id === 0 || d.id === 15) ? 'white' : '#1a237e')
       .attr('x', d => d.x)
       .attr('y', d => d.y);
 
-    // Affichage des valeurs lambda en rouge au-dessus de chaque sommet
+    // Affichage des valeurs lambda en sub au-dessus de chaque sommet
     if (lambdas && Array.isArray(lambdas)) {
       svg.append('g')
         .selectAll('text.lambda-label')
         .data(nodes)
         .enter().append('text')
         .attr('class', 'lambda-label')
-        .text(d => `λ${d.id + 1} = ${lambdas[d.id] !== undefined && lambdas[d.id] !== Infinity ? lambdas[d.id] : (lambdas[d.id] === Infinity ? '∞' : '')}`)
         .attr('font-size', 16)
         .attr('font-weight', 'bold')
-        .attr('fill', 'red')
+        .attr('fill', '#ffb300') // Jaune doré pour lambda
         .attr('text-anchor', 'middle')
         .attr('x', d => d.x)
-        .attr('y', d => d.y - nodeRadius - 12); // Positionné au-dessus du sommet
+        .attr('y', d => d.y - nodeRadius - 12) // Positionné au-dessus du sommet
+        .each(function (d) {
+          const value = lambdas[d.id] !== undefined && lambdas[d.id] !== Infinity
+            ? lambdas[d.id]
+            : (lambdas[d.id] === Infinity ? '∞' : '');
+          d3.select(this)
+            .html(null)
+            .append('tspan')
+            .text('λ')
+            .append('tspan')
+            .attr('baseline-shift', 'sub')
+            .attr('font-size', 12)
+            .text(d.id + 1);
+          d3.select(this)
+            .append('tspan')
+            .text(` = ${value}`);
+        });
     }
   };
 
