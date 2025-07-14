@@ -42,7 +42,7 @@ const GraphInterface = () => {
       { source: 6, destination: 7, weight: 1 },     // x7 -> x8
       { source: 6, destination: 10, weight: 8 },    // x7 -> x11
       { source: 7, destination: 6, weight: 1 },     // x8 -> x7
-      { source: 7, destination: 9, weight: 2 },     // x8 -> x10
+      { source: 7, destination: 9, weight: 2 },     // x8 -> x
       { source: 8, destination: 9, weight: 4 },     // x9 -> x10
       { source: 8, destination: 7, weight: 3 },     // x9 -> x8
       { source: 9, destination: 11, weight: 7 },    // x10 -> x12
@@ -332,7 +332,20 @@ ${pathResult.path.map(step => `x${step.from + 1} -> x${step.to + 1} (poids: ${st
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <button
+            className="bg-gray-400 text-white p-2 rounded hover:bg-gray-500"
+            onClick={() => {
+              setEdges([]);
+              setResult('');
+              setPathResult(null);
+              setCalculationSteps([]);
+              setLambdas([]);
+              setEdgeWeight(1);
+            }}
+          >
+            Réinitialiser
+          </button>
           <button
             className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
             onClick={handleAddEdge}
