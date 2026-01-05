@@ -7,8 +7,6 @@ const customGreen = '#43aa8b'; // Vert personnalisé
 
 const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onEdgeDelete, lambdas }) => {
   const svgRef = useRef(null);
-  const [selectedEdge, setSelectedEdge] = useState(null);
-  const [editWeight, setEditWeight] = useState('');
   // Ajout d'un état pour stocker les positions personnalisées
   const [customPositions, setCustomPositions] = useState({});
 
@@ -399,30 +397,8 @@ const GraphVisualization = ({ vertices, edges, path, pathType, onEdgeUpdate, onE
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-    };
-    // eslint-disable-next-line
+    };    // eslint-disable-next-line
   }, [edges.length]);
-
-  const handleUpdateEdge = () => {
-    if (selectedEdge && onEdgeUpdate) {
-      onEdgeUpdate({
-        ...selectedEdge,
-        weight: parseInt(editWeight)
-      });
-      setSelectedEdge(null);
-    }
-  };
-
-  const handleDeleteEdge = () => {
-    if (selectedEdge && onEdgeDelete) {
-      onEdgeDelete(selectedEdge);
-      setSelectedEdge(null);
-    }
-  };
-
-  const handleCancel = () => {
-    setSelectedEdge(null);
-  };
 
   return (
     <div className="border rounded p-4 bg-white w-full overflow-hidden">

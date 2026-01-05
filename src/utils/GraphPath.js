@@ -137,9 +137,7 @@ class GraphPath {
     }
 
     return distances;
-  }
-
-  reconstructPath(start, end) {
+  } reconstructPath(start, end) {
     const path = [];
     let current = end;
     let totalWeight = 0;
@@ -151,10 +149,15 @@ class GraphPath {
     while (current !== start) {
       const prevVertex = this.predecessors[current];
 
-      const edge = this.edges.find(e =>
-        e.source === prevVertex &&
-        e.destination === current
-      );
+      // Extract the find logic to avoid unsafe reference in loop
+      let edge = null;
+      for (let i = 0; i < this.edges.length; i++) {
+        const e = this.edges[i];
+        if (e.source === prevVertex && e.destination === current) {
+          edge = e;
+          break;
+        }
+      }
 
       if (edge) {
         path.unshift({
